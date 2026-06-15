@@ -172,6 +172,24 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 24px;
+      position: relative;
+    }
+
+    .drop-indicator {
+      display: none;
+      position: absolute;
+      width: 4px;
+      background: linear-gradient(to bottom, var(--accent), #8b5cf6);
+      border-radius: 2px;
+      opacity: 0.85;
+      pointer-events: none;
+      z-index: 10;
+      transition: all 0.15s ease-out;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+    }
+
+    .drop-indicator.active {
+      display: block;
     }
 
     .tile {
@@ -296,6 +314,33 @@
     .admin-mode .tile:hover {
       transform: none;
       box-shadow: var(--shadow);
+    }
+
+    .admin-mode .tile {
+      cursor: grab;
+    }
+
+    .admin-mode .tile:active {
+      cursor: grabbing;
+    }
+
+    .tile.dragging {
+      opacity: 0.4;
+      transform: scale(0.98);
+    }
+
+    .tile.drag-over {
+      border: 2px dashed var(--accent);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .tile-actions .drag-handle {
+      cursor: grab;
+      font-size: 1rem;
+    }
+
+    .tile-actions .drag-handle:active {
+      cursor: grabbing;
     }
 
     /* Add Tile Button */
@@ -456,6 +501,64 @@
     .color-preset.active {
       border-color: var(--text);
       box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text);
+    }
+
+    .emoji-presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .emoji-preset {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      transition: var(--transition);
+    }
+
+    .emoji-preset:hover {
+      transform: scale(1.15);
+      background: var(--bg-elevated);
+    }
+
+    .emoji-preset.active {
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+      box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent);
+    }
+
+    .emoji-search {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      transition: var(--transition);
+    }
+
+    .emoji-search:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .emoji-search::placeholder {
+      color: var(--text-muted);
+      opacity: 0.7;
     }
 
     .modal-actions {
@@ -629,6 +732,8 @@
       <div class="form-group">
         <label>Icon (emoji)</label>
         <input type="text" id="tileIcon" placeholder="e.g. 🏠">
+        <input type="text" id="emojiSearch" class="emoji-search" placeholder="Search emojis... (e.g. house, money, chart)" oninput="renderEmojiPresets(this.value)">
+        <div class="emoji-presets" id="emojiPresets"></div>
       </div>
       <div class="form-group">
         <label>Color</label>
@@ -678,6 +783,14 @@
         path: '/EstatePro',
         icon: '📋',
         color: '#6366f1'
+      },
+      {
+        id: 'portfolio',
+        name: 'MyPortfolio',
+        desc: 'Portfolio Manager — track holdings, dividends, transactions, and generate reports.',
+        path: '/Portfolio',
+        icon: '📈',
+        color: '#f59e0b'
       }
     ];
 
@@ -686,6 +799,66 @@
       '#ec4899', '#ef4444', '#f59e0b', '#22c55e', '#06b6d4',
       '#64748b', '#475569'
     ];
+
+    const RECOMMENDED_EMOJIS = [
+      '🏠', '💊', '💰', '📋', '📈', '📉', '📊', '🏦', '💳', '🧾',
+      '📅', '📆', '📂', '📁', '🗂️', '🗃️', '🔒', '🔓', '📱', '💻',
+      '📌', '📍', '📎', '📏', '📐', '✂️', '🗑️', '🔑', '🗝️', '🔨',
+      '🪛', '🔧', '🪜', '🧰', '📦', '📫', '📬', '📪', '📭', '📮',
+      '🗳️', '✉️', '📩', '📨', '📧', '📤', '📥', '🚗', '🏥', '🏦'
+    ];
+
+    const EMOJI_NAMES = {
+      '🏠': 'house home building',
+      '💊': 'pill medicine drug medical health',
+      '💰': 'money bag cash dollar wealth',
+      '📋': 'clipboard document list task',
+      '📈': 'chart up trend growth increase',
+      '📉': 'chart down decrease decline',
+      '📊': 'bar chart graph analytics stats',
+      '🏦': 'bank building finance institution',
+      '💳': 'credit card payment bank',
+      '🧾': 'receipt bill invoice document',
+      '📅': 'calendar date schedule event',
+      '📆': 'calendar tear off date',
+      '📂': 'folder open file document',
+      '📁': 'folder file directory',
+      '🗂️': 'card index organizer dividers',
+      '🗃️': 'card file box archive cabinet',
+      '🔒': 'lock secure private security',
+      '🔓': 'unlock open insecure',
+      '📱': 'phone mobile cell device',
+      '💻': 'laptop computer screen device',
+      '📌': 'pin pushpin marker location',
+      '📍': 'round pin location map marker',
+      '📎': 'paperclip attachment link',
+      '📏': 'ruler straightedge measure',
+      '📐': 'triangular ruler measure angle',
+      '✂️': 'scissors cut tool',
+      '🗑️': 'wastebasket trash bin delete',
+      '🔑': 'key password access unlock',
+      '🗝️': 'old key skeleton lock',
+      '🔨': 'hammer tool build construction',
+      '🪛': 'screwdriver tool repair',
+      '🔧': 'wrench tool settings spanner',
+      '🪜': 'ladder climb tool step',
+      '🧰': 'toolbox toolkit repair mechanic',
+      '📦': 'package box parcel delivery shipping',
+      '📫': 'mailbox closed flag post',
+      '📬': 'mailbox open flag mail',
+      '📪': 'mailbox closed no flag',
+      '📭': 'mailbox lowered flag empty',
+      '📮': 'postbox mail drop letter',
+      '🗳️': 'ballot box vote election',
+      '✉️': 'envelope mail letter message',
+      '📩': 'envelope arrow email incoming',
+      '📨': 'incoming envelope mail receive',
+      '📧': 'e-mail email message letter',
+      '📤': 'outbox tray send upload',
+      '📥': 'inbox tray receive download',
+      '🚗': 'car automobile vehicle drive transport',
+      '🏥': 'hospital medical emergency clinic'
+    };
 
     const ADMIN_PASSWORD = 'Beerp0ng'; // Change this to your preferred password
     const STORAGE_KEY = 'app-dashboard-tiles';
@@ -696,6 +869,8 @@
     let isAdmin = false;
     let editingId = null;
     let selectedColor = COLOR_PRESETS[0];
+    let isDragging = false;
+    let dragSrcIndex = null;
 
     // ==================== Init ====================
     function init() {
@@ -703,6 +878,10 @@
       loadTiles();
       renderTiles();
       renderColorPresets();
+      const grid = document.getElementById('tilesGrid');
+      grid.addEventListener('dragover', handleGridDragOver);
+      grid.addEventListener('dragleave', handleGridDragLeave);
+      grid.addEventListener('drop', handleGridDrop);
     }
 
     // ==================== Theme ====================
@@ -769,7 +948,7 @@
         return;
       }
 
-      tiles.forEach(tile => {
+      tiles.forEach((tile, index) => {
         const el = document.createElement('a');
         el.className = 'tile';
         el.href = isAdmin ? 'javascript:void(0)' : tile.path;
@@ -777,6 +956,7 @@
         el.style.setProperty('--tile-bg', hexToRgba(tile.color, 0.12));
         el.innerHTML = `
           <div class="tile-actions">
+            <button class="drag-handle" title="Drag to reorder" onclick="event.preventDefault(); event.stopPropagation();">☰</button>
             <button onclick="event.preventDefault(); event.stopPropagation(); openTileModal('${tile.id}')" title="Edit">✏️</button>
           </div>
           <div class="tile-icon">${tile.icon}</div>
@@ -796,9 +976,22 @@
           });
         } else {
           el.addEventListener('click', (e) => {
+            if (isDragging) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
             e.preventDefault();
             openTileModal(tile.id);
           });
+          el.draggable = true;
+          el.dataset.index = index;
+          el.addEventListener('dragstart', handleDragStart);
+          el.addEventListener('dragover', handleDragOver);
+          el.addEventListener('dragenter', handleDragEnter);
+          el.addEventListener('dragleave', handleDragLeave);
+          el.addEventListener('drop', handleDrop);
+          el.addEventListener('dragend', handleDragEnd);
         }
         grid.appendChild(el);
       });
@@ -812,6 +1005,7 @@
       }
 
       document.body.classList.toggle('admin-mode', isAdmin);
+      ensureDropIndicator();
     }
 
     // ==================== Admin ====================
@@ -858,6 +1052,171 @@
       }
     })();
 
+    // ==================== Drag & Drop ====================
+    function handleDragStart(e) {
+      isDragging = true;
+      dragSrcIndex = parseInt(this.dataset.index, 10);
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.index);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDragEnter(e) {
+      this.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      if (!this.contains(e.relatedTarget)) {
+        this.classList.remove('drag-over');
+      }
+    }
+
+    function handleDrop(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.classList.remove('drag-over');
+      hideDropIndicator();
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const toIndex = parseInt(this.dataset.index, 10);
+      if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
+      const movedTile = tiles.splice(fromIndex, 1)[0];
+      tiles.splice(toIndex, 0, movedTile);
+      saveTiles();
+      renderTiles();
+      showToast('Tile reordered', 'success');
+    }
+
+    function handleDragEnd() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.tile').forEach(tile => tile.classList.remove('drag-over'));
+      hideDropIndicator();
+      dragSrcIndex = null;
+      setTimeout(() => { isDragging = false; }, 50);
+    }
+
+    // ==================== Grid Drop Zone ====================
+    function ensureDropIndicator() {
+      const grid = document.getElementById('tilesGrid');
+      let indicator = document.getElementById('dropIndicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'dropIndicator';
+        indicator.className = 'drop-indicator';
+        grid.appendChild(indicator);
+      }
+    }
+
+    function hideDropIndicator() {
+      const indicator = document.getElementById('dropIndicator');
+      if (indicator) indicator.classList.remove('active');
+    }
+
+    function getDragInsertIndex(e) {
+      const grid = document.getElementById('tilesGrid');
+      const tileElements = Array.from(grid.querySelectorAll('.tile'));
+      if (tileElements.length === 0) return 0;
+
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      let closestIndex = 0;
+      let closestDist = Infinity;
+
+      tileElements.forEach((tile, i) => {
+        const rect = tile.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const dist = Math.hypot(mouseX - centerX, mouseY - centerY);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIndex = i;
+        }
+      });
+
+      const closestTile = tileElements[closestIndex];
+      const rect = closestTile.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+
+      if (mouseX > centerX) {
+        return closestIndex + 1;
+      }
+      return closestIndex;
+    }
+
+    function positionDropIndicator(insertIndex) {
+      const indicator = document.getElementById('dropIndicator');
+      const grid = document.getElementById('tilesGrid');
+      const tileElements = Array.from(grid.querySelectorAll('.tile'));
+
+      if (!indicator || tileElements.length === 0) {
+        if (indicator) indicator.classList.remove('active');
+        return;
+      }
+
+      const gridRect = grid.getBoundingClientRect();
+      let targetTile, side;
+
+      if (insertIndex <= 0) {
+        targetTile = tileElements[0];
+        side = 'left';
+      } else if (insertIndex >= tileElements.length) {
+        targetTile = tileElements[tileElements.length - 1];
+        side = 'right';
+      } else {
+        targetTile = tileElements[insertIndex];
+        side = 'left';
+      }
+
+      const rect = targetTile.getBoundingClientRect();
+      const left = (side === 'left' ? rect.left : rect.right) - gridRect.left;
+      const top = rect.top - gridRect.top;
+      const height = rect.height;
+
+      indicator.style.left = (left - 2) + 'px';
+      indicator.style.top = top + 'px';
+      indicator.style.height = height + 'px';
+      indicator.classList.add('active');
+    }
+
+    function handleGridDragOver(e) {
+      if (dragSrcIndex === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const insertIndex = getDragInsertIndex(e);
+      if (insertIndex !== null) {
+        positionDropIndicator(insertIndex);
+      }
+    }
+
+    function handleGridDragLeave(e) {
+      const grid = document.getElementById('tilesGrid');
+      if (!grid.contains(e.relatedTarget)) {
+        hideDropIndicator();
+      }
+    }
+
+    function handleGridDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      hideDropIndicator();
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const insertIndex = getDragInsertIndex(e);
+      dragSrcIndex = null;
+      if (isNaN(fromIndex) || insertIndex === null) return;
+      if (fromIndex === insertIndex || fromIndex + 1 === insertIndex) return;
+      const movedTile = tiles.splice(fromIndex, 1)[0];
+      const toIndex = insertIndex > fromIndex ? insertIndex - 1 : insertIndex;
+      tiles.splice(toIndex, 0, movedTile);
+      saveTiles();
+      renderTiles();
+      showToast('Tile reordered', 'success');
+    }
+
     // ==================== Tile Modal ====================
     function openTileModal(id) {
       editingId = id;
@@ -885,7 +1244,9 @@
         deleteBtn.style.display = 'none';
       }
 
+      document.getElementById('emojiSearch').value = '';
       renderColorPresets();
+      renderEmojiPresets();
       modal.classList.add('active');
     }
 
@@ -933,6 +1294,39 @@
       renderTiles();
       closeTileModal();
       showToast('Tile deleted', 'success');
+    }
+
+    // ==================== Emoji Presets ====================
+    function renderEmojiPresets(filter = '') {
+      const container = document.getElementById('emojiPresets');
+      if (!container) return;
+      container.innerHTML = '';
+      const currentIcon = document.getElementById('tileIcon').value.trim();
+      const term = filter.toLowerCase().trim();
+      const filtered = term
+        ? RECOMMENDED_EMOJIS.filter(emoji => {
+            const name = (EMOJI_NAMES[emoji] || '').toLowerCase();
+            return emoji === term || name.includes(term);
+          })
+        : RECOMMENDED_EMOJIS;
+      if (filtered.length === 0 && term) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color: var(--text-muted); font-size: 0.85rem; padding: 8px 4px; width: 100%;';
+        empty.textContent = 'No emojis found for "' + escapeHtml(term) + '"';
+        container.appendChild(empty);
+        return;
+      }
+      filtered.forEach(emoji => {
+        const div = document.createElement('div');
+        div.className = 'emoji-preset' + (emoji === currentIcon ? ' active' : '');
+        div.textContent = emoji;
+        div.title = (EMOJI_NAMES[emoji] || emoji).split(' ').slice(0, 2).join(' ');
+        div.onclick = () => {
+          document.getElementById('tileIcon').value = emoji;
+          renderEmojiPresets(term);
+        };
+        container.appendChild(div);
+      });
     }
 
     // ==================== Color Presets ====================
